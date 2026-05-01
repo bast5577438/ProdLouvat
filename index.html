@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>LOUVAT 2 — Production</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500;600&display=swap');
+  :root {
+    --bg:#0d0f14; --surface:#161920; --surface2:#1e2330; --border:#2a2f3d;
+    --text:#e8ecf4; --text-muted:#7a8199;
+    --red:#e84040; --red-glow:rgba(232,64,64,0.25);
+    --orange:#e88040; --orange-glow:rgba(232,128,64,0.25);
+    --green:#40c870; --green-glow:rgba(64,200,112,0.25);
+    --gold:#e8b840; --gold-glow:rgba(232,184,64,0.35);
+    --radius:12px;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { background:var(--bg); color:var(--text); font-family:'Barlow',sans-serif; min-height:100vh; overflow-x:hidden; }
+
+  .header { background:var(--surface); border-bottom:1px solid var(--border); padding:14px 20px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
+  .header-title { font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:22px; letter-spacing:2px; text-transform:uppercase; }
+  .header-title span { color:var(--gold); }
+  .header-right { display:flex; align-items:center; gap:10px; }
+  .header-date { font-size:13px; color:var(--text-muted); text-align:right; }
+  .sync-dot { width:8px; height:8px; border-radius:50%; background:var(--text-muted); flex-shrink:0; transition:background 0.4s; }
+  .sync-dot.synced  { background:var(--green); box-shadow:0 0 6px var(--green); }
+  .sync-dot.syncing { background:var(--orange); box-shadow:0 0 6px var(--orange); }
+  .sync-dot.error   { background:var(--red); box-shadow:0 0 6px var(--red); }
+
+  .tabs { display:flex; background:var(--surface); border-bottom:1px solid var(--border); }
+  .tab { flex:1; padding:13px 6px; font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:13px; letter-spacing:1px; text-transform:uppercase; color:var(--text-muted); border:none; background:none; cursor:pointer; border-bottom:3px solid transparent; transition:all 0.2s; }
+  .tab.active { color:var(--gold); border-bottom-color:var(--gold); }
+
+  .page { display:none; padding:16px; max-width:900px; margin:0 auto; }
+  .page.active { display:block; }
+
+  .ca-card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:24px 20px; text-align:center; margin-bottom:16px; position:relative; overflow:hidden; transition:all 0.5s; }
+  .ca-card::before { content:''; position:absolute; inset:0; opacity:0; transition:opacity 0.5s; pointer-events:none; }
+  .ca-card.rouge  { border-color:var(--red);    box-shadow:0 0 40px var(--red-glow); }
+  .ca-card.rouge::before  { background:radial-gradient(ellipse at 50% 0%,var(--red-glow),transparent 70%); opacity:1; }
+  .ca-card.orange { border-color:var(--orange); box-shadow:0 0 40px var(--orange-glow); }
+  .ca-card.orange::before { background:radial-gradient(ellipse at 50% 0%,var(--orange-glow),transparent 70%); opacity:1; }
+  .ca-card.vert   { border-color:var(--green);  box-shadow:0 0 40px var(--green-glow); }
+  .ca-card.vert::before   { background:radial-gradient(ellipse at 50% 0%,var(--green-glow),transparent 70%); opacity:1; }
+  .ca-card.dore   { border-color:var(--gold);   box-shadow:0 0 50px var(--gold-glow); }
+  .ca-card.dore::before   { background:radial-gradient(ellipse at 50% 0%,var(--gold-glow),transparent 70%); opacity:1; }
+
+  .ca-label  { font-family:'Barlow Condensed',sans-serif; font-size:13px; letter-spacing:3px; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px; }
+  .ca-amount { font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:72px; line-height:1; letter-spacing:-1px; transition:color 0.5s,text-shadow 0.5s; }
+  .ca-amount.rouge  { color:var(--red);    text-shadow:0 0 40px var(--red); }
+  .ca-amount.orange { color:var(--orange); text-shadow:0 0 40px var(--orange); }
+  .ca-amount.vert   { color:var(--green);  text-shadow:0 0 40px var(--green); }
+  .ca-amount.dore   { color:var(--gold);   text-shadow:0 0 60px var(--gold),0 0 20px rgba(255,220,100,0.8); animation:shimmer 2s ease-in-out infinite; }
+  @keyframes shimmer { 0%,100%{text-shadow:0 0 60px var(--gold),0 0 20px rgba(255,220,100,0.8);} 50%{text-shadow:0 0 80px #ffdd80,0 0 40px rgba(255,220,100,1),0 0 10px #fff;} }
+
+  .ca-trend { font-family:'Barlow Condensed',sans-serif; font-size:14px; letter-spacing:1px; margin-top:6px; min-height:18px; }
+  .trend-up  { color:var(--green); }
+  .trend-down{ color:var(--red); }
+  .trend-neu { color:var(--text-muted); }
+
+  .ca-badge { display:inline-block; margin-top:10px; padding:5px 16px; border-radius:30px; font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:15px; letter-spacing:2px; text-transform:uppercase; }
+  .badge-rouge  { background:var(--red-glow);    color:var(--red);    border:1px solid var(--red); }
+  .badge-orange { background:var(--orange-glow); color:var(--orange); border:1px solid var(--orange); }
+  .badge-vert   { background:var(--green-glow);  color:var(--green);  border:1px solid var(--green); }
+  .badge-dore   { background:var(--gold-glow);   color:var(--gold);   border:1px solid var(--gold); }
+
+  .progress-wrap { margin-bottom:16px; }
+  .progress-labels { display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-bottom:5px; font-family:'Barlow Condensed',sans-serif; letter-spacing:1px; }
+  .progress-track { height:10px; background:var(--surface2); border-radius:10px; overflow:hidden; }
+  .progress-fill  { height:100%; border-radius:10px; transition:width 0.7s cubic-bezier(0.34,1.56,0.64,1),background 0.5s; }
+  .progress-fill.rouge  { background:linear-gradient(90deg,#a02020,var(--red)); }
+  .progress-fill.orange { background:linear-gradient(90deg,#a05020,var(--orange)); }
+  .progress-fill.vert   { background:linear-gradient(90deg,#208040,var(--green)); }
+  .progress-fill.dore   { background:linear-gradient(90deg,#a07820,var(--gold)); box-shadow:0 0 10px var(--gold); }
+  .progress-milestones { display:flex; justify-content:space-between; margin-top:4px; font-size:10px; font-family:'Barlow Condensed',sans-serif; }
+  .ms { text-align:center; }
+  .ms b { display:block; width:2px; height:6px; background:var(--border); margin:0 auto 2px; }
+
+  .section-title { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:13px; letter-spacing:3px; text-transform:uppercase; color:var(--text-muted); margin-bottom:12px; }
+  .form-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px; margin-bottom:14px; }
+  .form-row  { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+  .field-label { font-size:11px; font-family:'Barlow Condensed',sans-serif; letter-spacing:2px; text-transform:uppercase; color:var(--text-muted); margin-bottom:5px; }
+  input[type="text"],input[type="number"],select { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:'Barlow',sans-serif; font-size:16px; padding:12px 14px; outline:none; transition:border-color 0.2s; -webkit-appearance:none; }
+  input:focus,select:focus { border-color:var(--gold); }
+  select option { background:var(--surface2); }
+  input[readonly] { opacity:0.55; cursor:default; }
+
+  .btn { width:100%; padding:14px; border:none; border-radius:10px; font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:17px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; transition:all 0.2s; }
+  .btn:active { transform:scale(0.97); }
+  .btn-add    { background:linear-gradient(135deg,#2a6e40,#40c870); color:#fff; margin-bottom:8px; }
+  .btn-reset  { background:var(--surface2); color:var(--text-muted); border:1px solid var(--border); margin-top:6px; }
+  .btn-danger { background:linear-gradient(135deg,#6e2020,#e84040); color:#fff; }
+  .btn-export { background:linear-gradient(135deg,#4a3a10,#e8b840); color:#1a1200; margin-bottom:8px; }
+  .btn-edit   { background:linear-gradient(135deg,#1a3060,#4080e8); color:#fff; }
+  .btn-sm     { padding:10px 16px; font-size:14px; width:auto; display:inline-block; }
+  .flex-row   { display:flex; gap:8px; }
+  .flex-row .btn { flex:1; }
+  .mt8  { margin-top:8px; }
+  .mt16 { margin-top:16px; }
+
+  .entry-list { display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+  .entry-item { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .entry-info { flex:1; min-width:0; }
+  .entry-op   { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .entry-meta { font-size:12px; color:var(--text-muted); margin-top:2px; }
+  .entry-ca   { font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:20px; white-space:nowrap; color:var(--green); }
+  .entry-delete { background:none; border:1px solid var(--border); color:var(--text-muted); border-radius:6px; padding:6px 10px; font-size:16px; cursor:pointer; flex-shrink:0; transition:all 0.2s; }
+  .entry-delete:hover { border-color:var(--red); color:var(--red); }
+  .empty-state { text-align:center; padding:30px 20px; color:var(--text-muted); font-size:14px; background:var(--surface); border:1px dashed var(--border); border-radius:var(--radius); }
+
+  .config-list { display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+  .config-item { display:flex; align-items:center; justify-content:space-between; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 14px; gap:10px; }
+  .config-name  { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:16px; }
+  .config-price { font-size:13px; color:var(--gold); }
+
+  .histo-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
+  .histo-stat { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px; text-align:center; }
+  .histo-stat-val   { font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:22px; color:var(--gold); }
+  .histo-stat-label { font-size:10px; color:var(--text-muted); font-family:'Barlow Condensed',sans-serif; letter-spacing:1px; text-transform:uppercase; margin-top:3px; }
+
+  .day-card   { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:10px; overflow:hidden; }
+  .day-header { padding:12px 16px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; user-select:none; }
+  .day-date   { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:16px; }
+  .day-total  { font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:20px; }
+  .day-body   { padding:0 16px 12px; display:none; }
+  .day-body.open { display:block; }
+  .day-row    { display:flex; justify-content:space-between; padding:6px 0; font-size:13px; color:var(--text-muted); border-bottom:1px solid var(--border); gap:8px; flex-wrap:wrap; }
+  .day-row:last-child { border:none; }
+
+  .sous-total-box { padding:10px 14px; background:var(--surface2); border-radius:8px; border:1px solid var(--border); margin-bottom:12px; }
+  .sous-total-val { font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:28px; color:var(--gold); }
+
+  .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(100px); background:var(--surface2); border:1px solid var(--border); border-radius:30px; padding:10px 22px; font-family:'Barlow Condensed',sans-serif; font-size:15px; letter-spacing:1px; z-index:999; transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1); white-space:nowrap; }
+  .toast.show    { transform:translateX(-50%) translateY(0); }
+  .toast.success { border-color:var(--green); color:var(--green); }
+  .toast.info    { border-color:var(--gold);  color:var(--gold); }
+  .toast.error   { border-color:var(--red);   color:var(--red); }
+
+  #loading-overlay { position:fixed; inset:0; background:rgba(13,15,20,0.95); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:2000; gap:16px; }
+  .spinner { width:36px; height:36px; border:3px solid var(--border); border-top-color:var(--gold); border-radius:50%; animation:spin 0.8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:1500; display:flex; align-items:center; justify-content:center; padding:20px; opacity:0; pointer-events:none; transition:opacity 0.2s; }
+  .modal-overlay.open { opacity:1; pointer-events:all; }
+  .modal { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:24px 20px; max-width:360px; width:100%; }
+  .modal-title { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:18px; letter-spacing:1px; text-transform:uppercase; margin-bottom:10px; }
+  .modal-msg   { font-size:14px; color:var(--text-muted); margin-bottom:20px; line-height:1.6; }
+  .modal-btns  { display:flex; gap:10px; }
+  .modal-btns .btn { margin:0; }
+</style>
+</head>
+<body>
+
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <div style="font-family:'Barlow Condensed',sans-serif;color:var(--text-muted);font-size:14px;letter-spacing:2px;">CHARGEMENT…</div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle">Confirmation</div>
+    <div class="modal-msg"   id="modalMsg"></div>
+    <div class="modal-btns">
+      <button class="btn btn-reset" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-danger" id="modalConfirmBtn">Confirmer</button>
+    </div>
+  </div>
+</div>
+
+<div class="header">
+  <div class="header-title">LOUVAT <span>2</span></div>
+  <div class="header-right">
+    <div class="sync-dot" id="syncDot" title="Statut synchronisation"></div>
+    <div class="header-date" id="headerDate"></div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('saisie',this)">📦 Saisie</button>
+  <button class="tab" onclick="switchTab('journee',this)">📊 Journée</button>
+  <button class="tab" onclick="switchTab('historique',this)">🗂 Historique</button>
+  <button class="tab" onclick="switchTab('config',this)">⚙️ Config</button>
+</div>
+
+<!-- SAISIE -->
+<div class="page active" id="page-saisie">
+  <div class="ca-card" id="caCard">
+    <div class="ca-label">Chiffre d'affaires du jour</div>
+    <div class="ca-amount" id="caAmount">0,00 €</div>
+    <div class="ca-trend" id="caTrend"></div>
+    <div id="caBadge"></div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-labels"><span>0 €</span><span>Progression journée</span><span id="objMax">10 000 €</span></div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    <div class="progress-milestones">
+      <div class="ms" style="color:var(--red)"><b style="background:var(--red)"></b><span id="ms1">4 500€</span></div>
+      <div class="ms" style="color:var(--orange)"><b style="background:var(--orange)"></b><span id="ms2">5 000€</span></div>
+      <div class="ms" style="color:var(--green)"><b style="background:var(--green)"></b><span id="ms3">10 000€</span></div>
+      <div class="ms" style="color:var(--gold)"><b style="background:var(--gold)"></b>Doré ✦</div>
+    </div>
+  </div>
+
+  <div class="form-card">
+    <div class="section-title">Nouvelle saisie</div>
+    <div style="margin-bottom:10px">
+      <div class="field-label">Opération</div>
+      <select id="selectOp" onchange="onOpSelect()">
+        <option value="">— Choisir une opération —</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <div>
+        <div class="field-label">Quantité (kg)</div>
+        <input type="text" inputmode="decimal" id="inputKg" placeholder="0.00">
+      </div>
+      <div>
+        <div class="field-label">Prix €/kg (depuis Config)</div>
+        <input type="text" id="inputPrix" placeholder="— choisir opération —" readonly>
+      </div>
+    </div>
+    <div class="sous-total-box">
+      <div class="field-label">Sous-total</div>
+      <div class="sous-total-val" id="sousTotal">0,00 €</div>
+    </div>
+    <button class="btn btn-add" onclick="addEntry()">✔ Ajouter</button>
+  </div>
+
+  <div class="section-title">Saisies du jour</div>
+  <div class="entry-list" id="entryList">
+    <div class="empty-state">Aucune saisie pour l'instant.</div>
+  </div>
+  <button class="btn btn-reset" onclick="askConfirm('Clôturer la journée','Archiver toutes les saisies du jour dans l\'historique ?',confirmReset,'btn-add','💾 Clôturer')">💾 Clôturer et sauvegarder la journée</button>
+</div>
+
+<!-- JOURNÉE -->
+<div class="page" id="page-journee">
+  <div class="ca-card" id="caCard2">
+    <div class="ca-label">Chiffre d'affaires du jour</div>
+    <div class="ca-amount" id="caAmount2">0,00 €</div>
+    <div class="ca-trend" id="caTrend2"></div>
+    <div id="caBadge2"></div>
+  </div>
+  <div class="form-card">
+    <div class="section-title">Récap par opération</div>
+    <div id="statsOps"><div class="empty-state" style="border:none">Aucune donnée</div></div>
+  </div>
+  <button class="btn btn-export" onclick="exportCSV()">⬇ Exporter CSV journée</button>
+</div>
+
+<!-- HISTORIQUE -->
+<div class="page" id="page-historique">
+  <div class="histo-summary" id="histoSummary"></div>
+  <div class="form-card">
+    <div class="flex-row">
+      <button class="btn btn-export btn-sm" onclick="exportAllCSV()">⬇ Export tout CSV</button>
+      <button class="btn btn-danger btn-sm" onclick="askConfirm('Effacer l\'historique','Action irréversible — tout l\'historique sera supprimé.',confirmClearHistory,'btn-danger','🗑 Effacer')">🗑 Effacer tout</button>
+    </div>
+  </div>
+  <div id="histoList"><div class="empty-state">Aucun historique sauvegardé.</div></div>
+</div>
+
+<!-- CONFIG -->
+<div class="page" id="page-config">
+  <div class="form-card" id="opFormCard">
+    <div class="section-title" id="opFormTitle">Ajouter une opération</div>
+    <div style="margin-bottom:10px">
+      <div class="field-label">Nom de l'opération</div>
+      <input type="text" id="cfgName" placeholder="ex: Découpe, Emballage…">
+    </div>
+    <div style="margin-bottom:12px">
+      <div class="field-label">Prix de vente (€/kg) <span style="color:var(--red)">*</span> obligatoire</div>
+      <input type="text" inputmode="decimal" id="cfgPrix" placeholder="ex: 12.50">
+    </div>
+    <div class="flex-row">
+      <button class="btn btn-add" id="opFormBtn" onclick="submitOpForm()">✔ Enregistrer</button>
+      <button class="btn btn-reset btn-sm" id="opCancelBtn" style="display:none" onclick="cancelEditOp()">✕ Annuler</button>
+    </div>
+  </div>
+
+  <div class="section-title">Opérations configurées</div>
+  <div class="config-list" id="configList">
+    <div class="empty-state">Aucune opération configurée.</div>
+  </div>
+
+  <div class="form-card mt16">
+    <div class="section-title">Objectifs de CA</div>
+    <div class="form-row">
+      <div>
+        <div class="field-label" style="color:var(--red)">🔴 Max rouge (€)</div>
+        <input type="text" inputmode="decimal" id="objRouge" value="4500">
+      </div>
+      <div>
+        <div class="field-label" style="color:var(--orange)">🟠 Max orange (€)</div>
+        <input type="text" inputmode="decimal" id="objOrange" value="5000">
+      </div>
+    </div>
+    <div style="margin-bottom:12px">
+      <div class="field-label" style="color:var(--green)">🟢 Max vert / seuil doré (€)</div>
+      <input type="text" inputmode="decimal" id="objVert" value="10000">
+    </div>
+    <button class="btn btn-add" onclick="saveObjectifs()">✔ Sauvegarder objectifs</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ================================================================
+// FIREBASE — Realtime Database
+// ================================================================
+var FB_URL = 'https://prodlouvat-default-rtdb.europe-west1.firebasedatabase.app/state.json';
+
+var state = {
+  entries:   [],
+  operations:[],
+  history:   [],
+  objectifs: { rouge:4500, orange:5000, vert:10000 }
+};
+
+var fbLoaded    = false;
+var saveTimeout = null;
+
+function setSyncDot(s) {
+  document.getElementById('syncDot').className = 'sync-dot ' + (s||'');
+}
+
+async function loadFromFirebase() {
+  if (fbLoaded) return;
+  setSyncDot('syncing');
+  try {
+    var r    = await fetch(FB_URL);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var text = await r.text();
+    var data = (text && text.trim() !== 'null') ? JSON.parse(text) : null;
+    if (data) {
+      state.entries    = data.entries    || [];
+      state.operations = data.operations || [];
+      state.history    = data.history    || [];
+      state.objectifs  = data.objectifs  || state.objectifs;
+    } else {
+      loadFromLocalStorage(); // Migration depuis l'ancien stockage local
+    }
+    setSyncDot('synced');
+  } catch(e) {
+    console.warn('Firebase load failed, fallback localStorage:', e);
+    loadFromLocalStorage();
+    setSyncDot('error');
+    toast('Hors-ligne — données locales chargées', 'error');
+  }
+  fbLoaded = true;
+  document.getElementById('loading-overlay').style.display = 'none';
+  checkYesterdayEntries();
+  renderAll();
+  renderConfig();
+}
+
+function loadFromLocalStorage() {
+  try {
+    var d = localStorage.getItem('louvat2_v2');
+    if (d) {
+      var p = JSON.parse(d);
+      state.entries    = p.entries    || [];
+      state.operations = p.operations || [];
+      state.history    = p.history    || [];
+      state.objectifs  = p.objectifs  || state.objectifs;
+    }
+  } catch(e) {}
+}
+
+// Debounce : regroupe les sauvegardes rapprochées en une seule requête
+function save() {
+  setSyncDot('syncing');
+  try { localStorage.setItem('louvat2_v2', JSON.stringify(state)); } catch(e) {} // Backup local
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(pushToFirebase, 800);
+}
+
+async function pushToFirebase() {
+  try {
+    var r = await fetch(FB_URL, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        entries:   state.entries,
+        operations:state.operations,
+        history:   state.history,
+        objectifs: state.objectifs
+      })
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    setSyncDot('synced');
+  } catch(e) {
+    console.warn('Firebase save failed:', e);
+    setSyncDot('error');
+    toast('Erreur sauvegarde Firebase !', 'error');
+  }
+}
+
+// ================================================================
+// DÉTECTION DES SAISIES DE LA VEILLE
+// Si des saisies non clôturées datent d'hier (ou avant), on propose
+// de les archiver automatiquement au chargement.
+// ================================================================
+function checkYesterdayEntries() {
+  if (!state.entries.length) return;
+  var today = new Date().toLocaleDateString('fr-FR');
+  var firstDate = state.entries[0] && state.entries[0].date;
+  if (firstDate && firstDate !== today) {
+    askConfirm(
+      'Saisies non clôturées détectées',
+      'Des saisies du ' + firstDate + ' (' + fmt(totalJour()) + ') n\'ont pas été clôturées. Les archiver maintenant ?',
+      function() { archiveEntries(firstDate); toast('Journée du ' + firstDate + ' archivée ✔', 'success'); },
+      'btn-add',
+      '📦 Archiver'
+    );
+  }
+}
+
+// ================================================================
+// NAVIGATION
+// ================================================================
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  document.getElementById('page-' + name).classList.add('active');
+  if (name === 'journee')    renderJournee();
+  if (name === 'historique') renderHistorique();
+  if (name === 'config')     renderConfig();
+}
+
+// ================================================================
+// UTILITAIRES
+// ================================================================
+function fmt(n) {
+  return n.toLocaleString('fr-FR', { minimumFractionDigits:2, maximumFractionDigits:2 }) + ' €';
+}
+function totalJour() {
+  return state.entries.reduce(function(s,e){ return s+e.ca; }, 0);
+}
+function couleur(total) {
+  var o = state.objectifs;
+  if (total < o.rouge)  return 'rouge';
+  if (total < o.orange) return 'orange';
+  if (total <= o.vert)  return 'vert';
+  return 'dore';
+}
+function badgeLabel(c) {
+  return { rouge:'❌ En dessous de l\'objectif', orange:'⚠️ Presque là…', vert:'✅ Objectif atteint !', dore:'⭐ Excellent ! Objectif dépassé !' }[c];
+}
+function updateHeaderDate() {
+  var now = new Date();
+  document.getElementById('headerDate').innerHTML =
+    now.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'}) +
+    '<br>' + now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+}
+
+// ================================================================
+// CARTE CA + TENDANCE
+// ================================================================
+function calcTrend(total) {
+  if (state.history.length < 1) return '';
+  var last5 = state.history.slice(-5);
+  var avg   = last5.reduce(function(s,h){ return s+h.total; },0) / last5.length;
+  if (!avg) return '';
+  var diff = total - avg;
+  var pct  = Math.round((diff/avg)*100);
+  if (Math.abs(pct) < 1) return '<span class="trend-neu">= Dans la moyenne (' + fmt(avg) + ' / jour)</span>';
+  var cls  = diff > 0 ? 'trend-up' : 'trend-down';
+  var sign = diff > 0 ? '▲ +' : '▼ ';
+  return '<span class="' + cls + '">' + sign + pct + '% vs moy. ' + fmt(avg) + ' / jour</span>';
+}
+
+function updateCA() {
+  var total = totalJour();
+  var c = couleur(total);
+  var o = state.objectifs;
+  var cv = { rouge:'red', orange:'orange', vert:'green', dore:'gold' };
+  var trendHtml = calcTrend(total);
+
+  [['caCard','caAmount','caBadge','caTrend'],['caCard2','caAmount2','caBadge2','caTrend2']].forEach(function(ids){
+    var card = document.getElementById(ids[0]);
+    var amt  = document.getElementById(ids[1]);
+    var bdg  = document.getElementById(ids[2]);
+    var trnd = document.getElementById(ids[3]);
+    if (!card) return;
+    card.className = 'ca-card ' + c;
+    amt.className  = 'ca-amount ' + c;
+    amt.textContent = fmt(total);
+    bdg.innerHTML  = '<div class="ca-badge badge-' + c + '">' + badgeLabel(c) + '</div>';
+    if (trnd) trnd.innerHTML = trendHtml;
+  });
+
+  var maxDisplay = Math.max(o.vert*1.1, total*1.05, 1);
+  var pct = Math.min((total/maxDisplay)*100, 100);
+  var fill = document.getElementById('progressFill');
+  if (fill) { fill.style.width = pct+'%'; fill.className = 'progress-fill '+c; }
+
+  var e1=document.getElementById('ms1'); if(e1) e1.textContent=o.rouge.toLocaleString('fr-FR')+'€';
+  var e2=document.getElementById('ms2'); if(e2) e2.textContent=o.orange.toLocaleString('fr-FR')+'€';
+  var e3=document.getElementById('ms3'); if(e3) e3.textContent=o.vert.toLocaleString('fr-FR')+'€';
+  var eM=document.getElementById('objMax'); if(eM) eM.textContent=o.vert.toLocaleString('fr-FR')+' €';
+}
+
+// ================================================================
+// SAISIE
+// ================================================================
+function updateSousTotal() {
+  var kg = parseFloat(document.getElementById('inputKg').value.replace(',','.')) || 0;
+  var px = parseFloat(document.getElementById('inputPrix').value.replace(',','.')) || 0;
+  document.getElementById('sousTotal').textContent = fmt(kg*px);
+}
+
+function onOpSelect() {
+  var id = document.getElementById('selectOp').value;
+  var op = state.operations.find(function(o){ return o.id===id; });
+  var pf = document.getElementById('inputPrix');
+  pf.value       = op && op.prix ? op.prix : '';
+  pf.placeholder = op && op.prix ? op.prix+' €/kg' : '— choisir opération —';
+  updateSousTotal();
+}
+
+function addEntry() {
+  var opId = document.getElementById('selectOp').value;
+  var kg   = parseFloat(document.getElementById('inputKg').value.replace(',','.'));
+  var op   = state.operations.find(function(o){ return o.id===opId; });
+  var prix = op ? parseFloat(op.prix) : 0;
+
+  if (!opId)              { toast('Choisissez une opération','info'); return; }
+  if (!op||!prix||prix<=0){ toast('Prix manquant — configurez le prix dans Config','info'); return; }
+  if (!kg||kg<=0)         { toast('Entrez une quantité valide','info'); return; }
+
+  var now = new Date();
+  state.entries.push({
+    id:   Date.now().toString(),
+    op:   op.name, kg:kg, prix:prix, ca:kg*prix,
+    time: now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}),
+    date: now.toLocaleDateString('fr-FR')
+  });
+  save();
+  document.getElementById('inputKg').value = '';
+  document.getElementById('sousTotal').textContent = '0,00 €';
+  renderAll();
+  toast('Ajouté : '+fmt(kg*prix),'success');
+}
+
+function deleteEntry(id) {
+  var e = state.entries.find(function(x){ return x.id===id; });
+  if (!e) return;
+  askConfirm(
+    'Supprimer cette saisie',
+    e.op + ' — ' + e.kg + ' kg — ' + fmt(e.ca),
+    function(){ state.entries=state.entries.filter(function(x){ return x.id!==id; }); save(); renderAll(); toast('Saisie supprimée','info'); },
+    'btn-danger', '🗑 Supprimer'
+  );
+}
+
+function renderEntries() {
+  var list = document.getElementById('entryList');
+  if (!list) return;
+  if (!state.entries.length) {
+    list.innerHTML = '<div class="empty-state">Aucune saisie pour l\'instant.<br>Ajoutez une opération ci-dessus.</div>';
+    return;
+  }
+  list.innerHTML = state.entries.slice().reverse().map(function(e){
+    return '<div class="entry-item">'
+      +'<div class="entry-info"><div class="entry-op">'+e.op+'</div>'
+      +'<div class="entry-meta">'+e.kg+' kg × '+parseFloat(e.prix).toFixed(2)+' €/kg — '+e.time+'</div></div>'
+      +'<div class="entry-ca">'+fmt(e.ca)+'</div>'
+      +'<button class="entry-delete" onclick="deleteEntry(\''+e.id+'\')">✕</button>'
+      +'</div>';
+  }).join('');
+}
+
+function renderSelectOp() {
+  var sel = document.getElementById('selectOp');
+  if (!sel) return;
+  var cur = sel.value;
+  sel.innerHTML = '<option value="">— Choisir une opération —</option>'
+    + state.operations.map(function(o){
+        return '<option value="'+o.id+'"'+(o.id===cur?' selected':'')+'>'+o.name+' ('+o.prix+' €/kg)</option>';
+      }).join('');
+}
+
+// ================================================================
+// CLÔTURE
+// ================================================================
+function archiveEntries(dateLabel) {
+  var ex = state.history.find(function(h){ return h.date===dateLabel; });
+  if (ex) {
+    ex.entries = ex.entries.concat(state.entries);
+    ex.total   = ex.entries.reduce(function(s,e){ return s+e.ca; },0);
+  } else {
+    state.history.push({ date:dateLabel, entries:state.entries.slice(), total:totalJour() });
+  }
+  state.entries = [];
+  // Réinitialise tout le formulaire
+  document.getElementById('selectOp').value = '';
+  document.getElementById('inputKg').value  = '';
+  var pf = document.getElementById('inputPrix');
+  pf.value = ''; pf.placeholder = '— choisir opération —';
+  document.getElementById('sousTotal').textContent = '0,00 €';
+  save(); renderAll();
+}
+
+function confirmReset() {
+  if (!state.entries.length) { toast('Aucune saisie à sauvegarder','info'); return; }
+  archiveEntries(new Date().toLocaleDateString('fr-FR'));
+  toast('Journée sauvegardée ✔','success');
+}
+
+// ================================================================
+// JOURNÉE
+// ================================================================
+function renderJournee() {
+  updateCA();
+  var wrap = document.getElementById('statsOps');
+  if (!wrap) return;
+  var grouped = {};
+  state.entries.forEach(function(e){
+    if (!grouped[e.op]) grouped[e.op]={kg:0,ca:0};
+    grouped[e.op].kg+=e.kg; grouped[e.op].ca+=e.ca;
+  });
+  var keys = Object.keys(grouped);
+  if (!keys.length) { wrap.innerHTML='<div class="empty-state" style="border:none">Aucune donnée</div>'; return; }
+  wrap.innerHTML = keys.map(function(k){
+    return '<div class="day-row" style="padding:8px 0"><span style="font-weight:600">'+k+'</span>'
+      +'<span>'+grouped[k].kg.toFixed(2)+' kg</span>'
+      +'<span style="color:var(--gold);font-family:\'Barlow Condensed\',sans-serif;font-weight:700;font-size:16px">'+fmt(grouped[k].ca)+'</span></div>';
+  }).join('');
+}
+
+// ================================================================
+// HISTORIQUE
+// ================================================================
+function renderHistorique() {
+  var wrap    = document.getElementById('histoList');
+  var sumWrap = document.getElementById('histoSummary');
+  if (!wrap) return;
+
+  if (sumWrap) {
+    if (state.history.length) {
+      var total = state.history.reduce(function(s,h){ return s+h.total; },0);
+      var avg   = total / state.history.length;
+      var best  = Math.max.apply(null, state.history.map(function(h){ return h.total; }));
+      sumWrap.innerHTML =
+        '<div class="histo-stat"><div class="histo-stat-val">'+fmt(total)+'</div><div class="histo-stat-label">Total cumulé</div></div>'
+       +'<div class="histo-stat"><div class="histo-stat-val">'+fmt(avg)+'</div><div class="histo-stat-label">Moy / jour</div></div>'
+       +'<div class="histo-stat"><div class="histo-stat-val">'+fmt(best)+'</div><div class="histo-stat-label">Meilleure journée</div></div>';
+    } else { sumWrap.innerHTML=''; }
+  }
+
+  if (!state.history.length) { wrap.innerHTML='<div class="empty-state">Aucun historique sauvegardé.</div>'; return; }
+  var cv = { rouge:'red', orange:'orange', vert:'green', dore:'gold' };
+  wrap.innerHTML = state.history.slice().reverse().map(function(h,i){
+    var c  = couleur(h.total);
+    var id = 'hday_'+i;
+    return '<div class="day-card"><div class="day-header" onclick="toggleDay(\''+id+'\')"><div class="day-date">'+h.date+'</div><div class="day-total" style="color:var(--'+cv[c]+')">'+fmt(h.total)+'</div></div>'
+      +'<div class="day-body" id="'+id+'">'
+      +h.entries.map(function(e){
+        return '<div class="day-row"><span>'+e.op+'</span><span>'+e.kg+' kg × '+parseFloat(e.prix).toFixed(2)+' €</span><span style="color:var(--gold)">'+fmt(e.ca)+'</span></div>';
+      }).join('')
+      +'</div></div>';
+  }).join('');
+}
+
+function toggleDay(id) { var el=document.getElementById(id); if(el) el.classList.toggle('open'); }
+
+function confirmClearHistory() {
+  state.history=[]; save(); renderHistorique(); toast('Historique effacé','info');
+}
+
+// ================================================================
+// CONFIG — Opérations (création + édition inline)
+// ================================================================
+var editingOpId = null;
+
+function startEditOp(id) {
+  var op = state.operations.find(function(o){ return o.id===id; });
+  if (!op) return;
+  editingOpId = id;
+  document.getElementById('cfgName').value = op.name;
+  document.getElementById('cfgPrix').value = op.prix;
+  document.getElementById('opFormTitle').textContent = '✎ Modifier l\'opération';
+  document.getElementById('opFormBtn').textContent   = '✔ Mettre à jour';
+  document.getElementById('opCancelBtn').style.display = 'inline-block';
+  document.getElementById('opFormCard').scrollIntoView({ behavior:'smooth' });
+  document.getElementById('cfgName').focus();
+}
+
+function cancelEditOp() {
+  editingOpId = null;
+  document.getElementById('cfgName').value = '';
+  document.getElementById('cfgPrix').value = '';
+  document.getElementById('opFormTitle').textContent = 'Ajouter une opération';
+  document.getElementById('opFormBtn').textContent   = '✔ Enregistrer';
+  document.getElementById('opCancelBtn').style.display = 'none';
+}
+
+function submitOpForm() {
+  var name = document.getElementById('cfgName').value.trim();
+  var prix = parseFloat(document.getElementById('cfgPrix').value.replace(',','.'));
+  if (!name)            { toast('Entrez un nom d\'opération','info'); return; }
+  if (!prix || prix<=0) { toast('Le prix est obligatoire et doit être > 0','info'); return; }
+
+  if (editingOpId) {
+    var op = state.operations.find(function(o){ return o.id===editingOpId; });
+    if (op) { op.name=name; op.prix=prix; }
+    cancelEditOp();
+    toast('Opération mise à jour','success');
+  } else {
+    state.operations.push({ id:Date.now().toString(), name:name, prix:prix });
+    document.getElementById('cfgName').value='';
+    document.getElementById('cfgPrix').value='';
+    toast('Opération ajoutée','success');
+  }
+  save(); renderConfig(); renderSelectOp();
+}
+
+function deleteOperation(id) {
+  askConfirm(
+    'Supprimer l\'opération',
+    'Cette opération sera supprimée. Les saisies existantes ne sont pas affectées.',
+    function(){
+      state.operations=state.operations.filter(function(o){ return o.id!==id; });
+      if (editingOpId===id) cancelEditOp();
+      save(); renderConfig(); renderSelectOp();
+      toast('Opération supprimée','info');
+    },
+    'btn-danger','🗑 Supprimer'
+  );
+}
+
+function renderConfig() {
+  document.getElementById('objRouge').value  = state.objectifs.rouge;
+  document.getElementById('objOrange').value = state.objectifs.orange;
+  document.getElementById('objVert').value   = state.objectifs.vert;
+  var list = document.getElementById('configList');
+  if (!list) return;
+  if (!state.operations.length) { list.innerHTML='<div class="empty-state">Aucune opération configurée.</div>'; return; }
+  list.innerHTML = state.operations.map(function(o){
+    return '<div class="config-item"><div><div class="config-name">'+o.name+'</div><div class="config-price">'+o.prix+' €/kg</div></div>'
+      +'<div class="flex-row" style="gap:6px">'
+      +'<button class="btn btn-edit btn-sm" onclick="startEditOp(\''+o.id+'\')">✎ Modifier</button>'
+      +'<button class="entry-delete" onclick="deleteOperation(\''+o.id+'\')">✕</button>'
+      +'</div></div>';
+  }).join('');
+}
+
+function saveObjectifs() {
+  var r  = parseFloat(document.getElementById('objRouge').value.replace(',','.'))  || 4500;
+  var or = parseFloat(document.getElementById('objOrange').value.replace(',','.')) || 5000;
+  var v  = parseFloat(document.getElementById('objVert').value.replace(',','.'))   || 10000;
+  if (r>=or||or>=v) { toast('Ordre requis : rouge < orange < vert','info'); return; }
+  state.objectifs={rouge:r,orange:or,vert:v};
+  save(); updateCA(); toast('Objectifs sauvegardés','success');
+}
+
+// ================================================================
+// EXPORT CSV
+// ================================================================
+function buildCSV(entries, dateLabel) {
+  var rows=[['Date/Heure','Opération','Kg','Prix €/kg','CA €']];
+  entries.forEach(function(e){ rows.push([e.time||dateLabel,e.op,e.kg,e.prix,parseFloat(e.ca).toFixed(2)]); });
+  return rows.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(';'); }).join('\n');
+}
+function downloadCSV(content,filename) {
+  var blob=new Blob(['\uFEFF'+content],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob); var a=document.createElement('a');
+  a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url);
+}
+function exportCSV() {
+  if (!state.entries.length) { toast('Aucune saisie à exporter','info'); return; }
+  var d=new Date().toLocaleDateString('fr-FR').replace(/\//g,'-');
+  downloadCSV(buildCSV(state.entries,d),'louvat2_'+d+'.csv'); toast('Export CSV lancé','success');
+}
+function exportAllCSV() {
+  if (!state.history.length) { toast('Aucun historique','info'); return; }
+  var all=[];
+  state.history.forEach(function(h){ h.entries.forEach(function(e){ all.push(Object.assign({},e,{time:h.date+' '+(e.time||'')})); }); });
+  downloadCSV(buildCSV(all,''),'louvat2_historique.csv'); toast('Export complet lancé','success');
+}
+
+// ================================================================
+// MODAL DE CONFIRMATION (remplace les confirm() natifs)
+// ================================================================
+var modalCallback = null;
+
+function askConfirm(title, msg, callback, btnClass, btnLabel) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalMsg').textContent   = msg;
+  var btn = document.getElementById('modalConfirmBtn');
+  btn.className   = 'btn ' + (btnClass||'btn-danger');
+  btn.textContent = btnLabel||'Confirmer';
+  modalCallback   = callback;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  modalCallback = null;
+}
+document.getElementById('modalConfirmBtn').addEventListener('click', function(){ closeModal(); if(modalCallback) modalCallback(); });
+document.getElementById('modalOverlay').addEventListener('click', function(e){ if(e.target===this) closeModal(); });
+
+// ================================================================
+// TOAST
+// ================================================================
+var toastTimer;
+function toast(msg,type) {
+  var el=document.getElementById('toast');
+  el.textContent=msg; el.className='toast '+(type||'info')+' show';
+  clearTimeout(toastTimer); toastTimer=setTimeout(function(){ el.classList.remove('show'); },2800);
+}
+
+// ================================================================
+// INIT
+// ================================================================
+function renderAll() { updateCA(); renderEntries(); renderSelectOp(); }
+
+updateHeaderDate();
+setInterval(updateHeaderDate, 60000);
+document.getElementById('inputKg').addEventListener('input', updateSousTotal);
+
+loadFromFirebase();
+</script>
+</body>
+</html>
